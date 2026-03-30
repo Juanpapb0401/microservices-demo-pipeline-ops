@@ -1,4 +1,4 @@
-name: Infrastructure Deploy
+name: Ops Infrastructure Deploy
 
 on:
   workflow_dispatch:
@@ -19,6 +19,9 @@ on:
 
 permissions:
   contents: read
+
+env:
+  INFRA_CHART_PATH: ./infrastructure/k8s
 
 jobs:
   deploy-infra-staging:
@@ -45,9 +48,9 @@ jobs:
           mkdir -p "$HOME/.kube"
           echo "$KUBE_CONFIG_DATA" | base64 -d > "$HOME/.kube/config"
 
-      - name: Deploy infrastructure chart
+      - name: Deploy infrastructure chart (Kafka + PostgreSQL)
         run: |
-          helm upgrade --install infrastructure ./infrastructure \
+          helm upgrade --install infrastructure "${INFRA_CHART_PATH}" \
             --namespace staging \
             --create-namespace
 
@@ -75,8 +78,8 @@ jobs:
           mkdir -p "$HOME/.kube"
           echo "$KUBE_CONFIG_DATA" | base64 -d > "$HOME/.kube/config"
 
-      - name: Deploy infrastructure chart
+      - name: Deploy infrastructure chart (Kafka + PostgreSQL)
         run: |
-          helm upgrade --install infrastructure ./infrastructure/k8s/ \
+          helm upgrade --install infrastructure "${INFRA_CHART_PATH}" \
             --namespace production \
             --create-namespace
