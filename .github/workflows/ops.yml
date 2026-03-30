@@ -35,6 +35,7 @@ permissions:
 
 env:
   SERVICE_CHART_ROOT: .
+  OPS_DRY_RUN: "true"
 
 jobs:
   deploy:
@@ -75,7 +76,15 @@ jobs:
             source_sha="${GITHUB_SHA}"
           fi
 
-          if [[ -n "$EXPECTED_APP_REPO" && "$EVENT_NAME" == "repository_dispatch" && "$source_repo" != "$EXPECTED_APP_REPO" ]]; then
+          # Single manual switch controlled in this workflow file (env.OPS_DRY_RUN).
+          # OPS_DRY_RUN=true  -> validate and summarize only
+          # OPS_DRY_RUN=false -> allow cloud deployment steps
+          dry_run="${OPS_DRY_RUN,,}"
+          if [[ "$dry_run" != "true" ]]; then
+            dry_run="false"
+          fi
+
+          if [[ "$EVENT_NAME" == "repository_dispatch" && -n "$EXPECTED_APP_REPO" && "$dry_run" != "true" && "$source_repo" != "$EXPECTED_APP_REPO" ]]; then
             echo "Unexpected source repo: $source_repo. Expected: $EXPECTED_APP_REPO"
             exit 1
           fi
@@ -99,6 +108,12 @@ jobs:
           echo "image=$image" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "environment=$environment" >> "$GITHUB_OUTPUT"
+          echo "dry_run=$dry_run" >> "$GITHUB_OUTPUT"
+          if [[ "$dry_run" == "true" ]]; then
+            echo "deploy_enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "deploy_enabled=true" >> "$GITHUB_OUTPUT"
+          fi
           echo "source_repo=$source_repo" >> "$GITHUB_OUTPUT"
           echo "source_sha=$source_sha" >> "$GITHUB_OUTPUT"
 
@@ -107,52 +122,66 @@ jobs:
 
       - name: Test pipeline
         run: |
-          echo "⭐ Event received ${{steps.payload.outputs}}"
+          echo "Event received"
+          echo "Service: ${{ steps.payload.outputs.service }}"
+          echo "Image: ${{ steps.payload.outputs.image }}:${{ steps.payload.outputs.tag }}"
+          echo "Environment: ${{ steps.payload.outputs.environment }}"
+          echo "Dry run: ${{ steps.payload.outputs.dry_run }}"
+          echo "Source: ${{ steps.payload.outputs.source_repo }} @ ${{ steps.payload.outputs.source_sha }}"
 
-    #   - name: Set up kubectl
-    #     uses: azure/setup-kubectl@v4
+      - name: Set up kubectl
+        if: steps.payload.outputs.deploy_enabled == 'true'
+        uses: azure/setup-kubectl@v4
 
-    #   - name: Set up Helm
-    #     uses: azure/setup-helm@v4
+      - name: Set up Helm
+        if: steps.payload.outputs.deploy_enabled == 'true'
+        uses: azure/setup-helm@v4
 
-    #   - name: Configure kubeconfig
-    #     env:
-    #       ENVIRONMENT: ${{ steps.payload.outputs.environment }}
-    #       KUBE_CONFIG_STAGING: ${{ secrets.KUBE_CONFIG_STAGING }}
-    #       KUBE_CONFIG_PRODUCTION: ${{ secrets.KUBE_CONFIG_PRODUCTION }}
-    #     run: |
-    #       mkdir -p "$HOME/.kube"
+      - name: Configure kubeconfig
+        if: steps.payload.outputs.deploy_enabled == 'true'
+        env:
+          ENVIRONMENT: ${{ steps.payload.outputs.environment }}
+          KUBE_CONFIG_STAGING: ${{ secrets.KUBE_CONFIG_STAGING }}
+          KUBE_CONFIG_PRODUCTION: ${{ secrets.KUBE_CONFIG_PRODUCTION }}
+        run: |
+          mkdir -p "$HOME/.kube"
 
-    #       if [[ "$ENVIRONMENT" == "production" ]]; then
-    #         kube_data="$KUBE_CONFIG_PRODUCTION"
-    #       else
-    #         kube_data="$KUBE_CONFIG_STAGING"
-    #       fi
+          if [[ "$ENVIRONMENT" == "production" ]]; then
+            kube_data="$KUBE_CONFIG_PRODUCTION"
+          else
+            kube_data="$KUBE_CONFIG_STAGING"
+          fi
 
-    #       if [[ -z "$kube_data" ]]; then
-    #         echo "Missing kubeconfig secret for environment: $ENVIRONMENT"
-    #         exit 1
-    #       fi
+          if [[ -z "$kube_data" ]]; then
+            echo "Missing kubeconfig secret for environment: $ENVIRONMENT"
+            exit 1
+          fi
 
-    #       echo "$kube_data" | base64 -d > "$HOME/.kube/config"
+          echo "$kube_data" | base64 -d > "$HOME/.kube/config"
 
-    #   - name: Deploy service with dispatched image tag
-    #     env:
-    #       SERVICE: ${{ steps.payload.outputs.service }}
-    #       IMAGE: ${{ steps.payload.outputs.image }}
-    #       TAG: ${{ steps.payload.outputs.tag }}
-    #       ENVIRONMENT: ${{ steps.payload.outputs.environment }}
-    #     run: |
-    #       helm upgrade --install "$SERVICE" "${SERVICE_CHART_ROOT}/$SERVICE/chart" \
-    #         --namespace "$ENVIRONMENT" \
-    #         --create-namespace \
-    #         --set image="${IMAGE}:${TAG}" \
-    #         --set service.type=LoadBalancer
+      - name: Deploy service with dispatched image tag
+        if: steps.payload.outputs.deploy_enabled == 'true'
+        env:
+          SERVICE: ${{ steps.payload.outputs.service }}
+          IMAGE: ${{ steps.payload.outputs.image }}
+          TAG: ${{ steps.payload.outputs.tag }}
+          ENVIRONMENT: ${{ steps.payload.outputs.environment }}
+        run: |
+          helm upgrade --install "$SERVICE" "${SERVICE_CHART_ROOT}/$SERVICE/chart" \
+            --namespace "$ENVIRONMENT" \
+            --create-namespace \
+            --set image="${IMAGE}:${TAG}" \
+            --set service.type=LoadBalancer
 
-    #   - name: Summary
-    #     run: |
-    #       echo "Deployed infrastructure and service successfully"
-    #       echo "Service: ${{ steps.payload.outputs.service }}"
-    #       echo "Image: ${{ steps.payload.outputs.image }}:${{ steps.payload.outputs.tag }}"
-    #       echo "Environment: ${{ steps.payload.outputs.environment }}"
-    #       echo "Source: ${{ steps.payload.outputs.source_repo }} @ ${{ steps.payload.outputs.source_sha }}"
+      - name: Summary
+        run: |
+          if [[ "${{ steps.payload.outputs.deploy_enabled }}" == "true" ]]; then
+            echo "Deployment executed successfully"
+          else
+            echo "Dry-run completed: no cloud resources were changed"
+          fi
+          echo "Service: ${{ steps.payload.outputs.service }}"
+          echo "Image: ${{ steps.payload.outputs.image }}:${{ steps.payload.outputs.tag }}"
+          echo "Environment: ${{ steps.payload.outputs.environment }}"
+          echo "Dry run: ${{ steps.payload.outputs.dry_run }}"
+          echo "Source: ${{ steps.payload.outputs.source_repo }} @ ${{ steps.payload.outputs.source_sha }}"
