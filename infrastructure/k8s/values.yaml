@@ -40,3 +40,8 @@ kafka:
     advertisedListeners: "PLAINTEXT://kafka:9092"
     controllerListenerNames: "CONTROLLER"
     listenerSecurityProtocolMap: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT"
+
+  topics:
+    - name: votes
+      partitions: 3
+      replicationFactor: 1
