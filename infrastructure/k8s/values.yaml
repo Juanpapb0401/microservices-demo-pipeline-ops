@@ -17,6 +17,14 @@ postgresql:
   service:
     port: 5432
 
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "250m"
+
 kafka:
   image:
     repository: apache/kafka
@@ -30,6 +38,14 @@ kafka:
   
   service:
     port: 9092
+
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "150m"
+    limits:
+      memory: "768Mi"
+      cpu: "400m"
   
   config:
     # Kafka configuration for Apache Kafka in KRaft mode

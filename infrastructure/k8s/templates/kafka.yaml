@@ -118,11 +118,11 @@ spec:
         {{- end }}
         resources:
           limits:
-            memory: "1Gi"
-            cpu: "500m"
+            memory: {{ .Values.kafka.resources.limits.memory | quote }}
+            cpu: {{ .Values.kafka.resources.limits.cpu | quote }}
           requests:
-            memory: "512Mi"
-            cpu: "250m"
+            memory: {{ .Values.kafka.resources.requests.memory | quote }}
+            cpu: {{ .Values.kafka.resources.requests.cpu | quote }}
       {{- if .Values.kafka.persistence.enabled }}
       volumes:
       - name: data

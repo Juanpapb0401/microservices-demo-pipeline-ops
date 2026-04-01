@@ -98,11 +98,11 @@ spec:
         {{- end }}
         resources:
           limits:
-            memory: "512Mi"
-            cpu: "500m"
+            memory: {{ .Values.postgresql.resources.limits.memory | quote }}
+            cpu: {{ .Values.postgresql.resources.limits.cpu | quote }}
           requests:
-            memory: "256Mi"
-            cpu: "250m"
+            memory: {{ .Values.postgresql.resources.requests.memory | quote }}
+            cpu: {{ .Values.postgresql.resources.requests.cpu | quote }}
       {{- if .Values.postgresql.persistence.enabled }}
       volumes:
       - name: data
