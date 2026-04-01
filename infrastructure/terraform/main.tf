@@ -2,24 +2,57 @@ provider "azurerm" {
   features {}
 }
 
+terraform {
+  required_version = ">= 1.5.0"
+
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "~> 4.66"
+    }
+  }
+}
+
+locals {
+  rg_name        = "rg-${var.project}"
+  aks_name       = "aks-${var.project}"
+  aks_dns_prefix = "aks-${var.project}"
+}
+
 resource "azurerm_resource_group" "rg" {
-  name     = "rg-taller-1"
-  location = "eastus2"
+  name     = local.rg_name
+  location = var.location
+
+  tags = {
+    project     = var.project
+    environment = "shared"
+    scope       = "single-aks"
+    managed_by  = "terraform"
+  }
 }
 
 resource "azurerm_kubernetes_cluster" "aks" {
-  name                = "aks-taller-1"
+  name                = local.aks_name
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
-  dns_prefix          = "aksdemo"
+  dns_prefix          = local.aks_dns_prefix
+  sku_tier            = var.sku_tier
 
   default_node_pool {
     name       = "default"
-    node_count = 1
-    vm_size    = "Standard_B2s"
+    node_count = var.node_count
+    vm_size    = var.vm_size
+    os_disk_size_gb = var.os_disk_size_gb
   }
 
   identity {
     type = "SystemAssigned"
+  }
+
+  tags = {
+    project     = var.project
+    environment = "shared"
+    scope       = "single-aks"
+    managed_by  = "terraform"
   }
 }
