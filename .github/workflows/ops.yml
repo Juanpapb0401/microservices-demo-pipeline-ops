@@ -35,7 +35,7 @@ permissions:
 
 env:
   SERVICE_CHART_ROOT: .
-  OPS_DRY_RUN: "false"
+  OPS_DRY_RUN: "true"
 
 jobs:
   deploy:
