@@ -179,19 +179,19 @@ jobs:
           SERVICE: ${{ steps.payload.outputs.service }}
           ENVIRONMENT: ${{ steps.payload.outputs.environment }}
         run: |
-          echo "Iniciando Smoke Test..."
-          echo "Esperando a que Kubernetes confirme que los nuevos Pods están saludables y listos..."
+          echo "Starting Smoke Test..."
+          echo "Waiting for Kubernetes to confirm that the new Pods are healthy and ready..."
           
-          # Esto bloquea el pipeline hasta que los Pods pasen sus Liveness/Readiness probes.
-          # Si falla la app o el código (CrashLoopBackOff), el comando falla y frena el pipeline.
+          # This blocks the pipeline until the Pods pass their Liveness/Readiness probes.
+          # If the app or code fails (CrashLoopBackOff), the command fails and stops the pipeline.
           if ! kubectl rollout status deployment/"$SERVICE" --namespace "$ENVIRONMENT" --timeout=150s; then
-            echo "❌ ERROR: El Smoke Test falló. El despliegue no alcanzó un estado saludable."
-            echo "Logs recientes de los fallos:"
+            echo "ERROR: Smoke Test failed. Deployment did not reach a healthy state."
+            echo "Recent pod logs for debugging:"
             kubectl get pods -n "$ENVIRONMENT" -l "app.kubernetes.io/name=$SERVICE"
             exit 1
           fi
           
-          echo "✅ Smoke Test Exitoso. Los pods están arriba."
+          echo "SUCCESS: Smoke Test passed. Pods are up."
           kubectl get pods -n "$ENVIRONMENT" -l "app.kubernetes.io/name=$SERVICE"
 
       - name: Summary
