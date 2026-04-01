@@ -93,6 +93,8 @@ spec:
           value: "{{ .Values.kafka.config.listenerSecurityProtocolMap }}"
         - name: KAFKA_LOG_DIRS
           value: /opt/kafka/data
+        - name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
+          value: "1"
         ports:
         - name: kafka
           containerPort: {{ .Values.kafka.service.port }}
