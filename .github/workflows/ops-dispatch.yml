@@ -1,4 +1,4 @@
-name: Ops Deploy
+name: Ops Dispatch Deploy
 
 on:
   repository_dispatch:
@@ -94,8 +94,13 @@ jobs:
             exit 1
           fi
 
-          if [[ -z "$image" || -z "$tag" || -z "$environment" ]]; then
-            echo "Missing required deploy values (image/tag/environment)."
+          if [[ -z "$environment" ]]; then
+            echo "Missing required deploy value (environment)."
+            exit 1
+          fi
+
+          if [[ -z "$image" || -z "$tag" ]]; then
+            echo "Missing required deploy values (image/tag)."
             exit 1
           fi
 

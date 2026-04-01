@@ -1,0 +1,153 @@
+name: Ops Chart Deploy On Push
+
+on:
+  push:
+    branches:
+      - develop
+      - main
+    paths:
+      - vote/chart/**
+      - result/chart/**
+      - worker/chart/**
+
+permissions:
+  contents: read
+
+env:
+  SERVICE_CHART_ROOT: .
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      services: ${{ steps.matrix.outputs.services }}
+      environment: ${{ steps.target.outputs.environment }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect chart changes
+        id: changed
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            vote:
+              - 'vote/chart/**'
+            result:
+              - 'result/chart/**'
+            worker:
+              - 'worker/chart/**'
+
+      - name: Resolve target environment from branch
+        id: target
+        run: |
+          if [[ "${GITHUB_REF_NAME}" == "main" ]]; then
+            echo "environment=production" >> "$GITHUB_OUTPUT"
+          else
+            echo "environment=staging" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build deployment matrix
+        id: matrix
+        run: |
+          services="[]"
+
+          if [[ "${{ steps.changed.outputs.vote }}" == "true" ]]; then
+            services='["vote"]'
+          fi
+
+          if [[ "${{ steps.changed.outputs.result }}" == "true" ]]; then
+            services="$(echo "$services" | jq -c '. + ["result"]')"
+          fi
+
+          if [[ "${{ steps.changed.outputs.worker }}" == "true" ]]; then
+            services="$(echo "$services" | jq -c '. + ["worker"]')"
+          fi
+
+          echo "services=$services" >> "$GITHUB_OUTPUT"
+
+  deploy-changed-services:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.services != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJson(needs.detect-changes.outputs.services) }}
+    concurrency:
+      group: ops-push-${{ needs.detect-changes.outputs.environment }}-${{ matrix.service }}
+      cancel-in-progress: false
+    env:
+      ENVIRONMENT: ${{ needs.detect-changes.outputs.environment }}
+      SERVICE: ${{ matrix.service }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+
+      - name: Configure kubeconfig
+        env:
+          KUBE_CONFIG_STAGING: ${{ secrets.KUBE_CONFIG_STAGING }}
+          KUBE_CONFIG_PRODUCTION: ${{ secrets.KUBE_CONFIG_PRODUCTION }}
+        run: |
+          mkdir -p "$HOME/.kube"
+
+          if [[ "$ENVIRONMENT" == "production" ]]; then
+            kube_data="$KUBE_CONFIG_PRODUCTION"
+          else
+            kube_data="$KUBE_CONFIG_STAGING"
+          fi
+
+          if [[ -z "$kube_data" ]]; then
+            echo "Missing kubeconfig secret for environment: $ENVIRONMENT"
+            exit 1
+          fi
+
+          echo "$kube_data" | base64 -d > "$HOME/.kube/config"
+
+      - name: Resolve current deployed image
+        id: image
+        run: |
+          current_image="$(kubectl get deployment "$SERVICE" --namespace "$ENVIRONMENT" -o jsonpath='{.spec.template.spec.containers[0].image}')"
+
+          if [[ -z "$current_image" ]]; then
+            echo "Deployment/$SERVICE not found in namespace/$ENVIRONMENT or has no image."
+            echo "Run manual Ops Deploy once with explicit image and tag."
+            exit 1
+          fi
+
+          if [[ "$current_image" != *:* ]]; then
+            echo "Current image has no tag: $current_image"
+            echo "Run manual Ops Deploy once with explicit image and tag."
+            exit 1
+          fi
+
+          image_repo="${current_image%:*}"
+          image_tag="${current_image##*:}"
+
+          echo "repo=$image_repo" >> "$GITHUB_OUTPUT"
+          echo "tag=$image_tag" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy changed chart with current image tag
+        run: |
+          helm upgrade --install "$SERVICE" "${SERVICE_CHART_ROOT}/$SERVICE/chart" \
+            --namespace "$ENVIRONMENT" \
+            --create-namespace \
+            --set image="${{ steps.image.outputs.repo }}:${{ steps.image.outputs.tag }}" \
+            --set service.type=LoadBalancer
+
+      - name: Smoke test
+        run: |
+          kubectl rollout status deployment/"$SERVICE" --namespace "$ENVIRONMENT" --timeout=180s
+
+      - name: Summary
+        run: |
+          echo "Push-based chart deploy completed"
+          echo "Service: $SERVICE"
+          echo "Environment: $ENVIRONMENT"
+          echo "Image: ${{ steps.image.outputs.repo }}:${{ steps.image.outputs.tag }}"
