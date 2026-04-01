@@ -11,7 +11,7 @@ Flujo base:
 
 ## Arquitectura
 
-Diagrama de referencia: 
+Diagrama de referencia:
 
 ![architecture.png](architecture.png)
 
@@ -98,4 +98,4 @@ Notas:
 
 ## Runbook
 
-Guia de demo y validacion operativa: [demo-runbook.md](demo-runbook.md)
+Guia de demo y validacion operativa: [docs/demo-runbook.md](docs/demo-runbook.md)
