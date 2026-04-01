@@ -1,4 +1,6 @@
-## 2. Estrategia de branching para operaciones — Trunk-Based Development
+# Branching Strategy
+
+## Estrategia de branching para operaciones — Trunk-Based Development
 
 ### Repositorio: `ops-repo`
 
