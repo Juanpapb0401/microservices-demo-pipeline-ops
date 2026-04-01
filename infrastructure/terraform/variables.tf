@@ -11,9 +11,27 @@ variable "location" {
 }
 
 variable "node_count" {
-  description = "Default node count for the AKS system node pool."
+  description = "Default node count when autoscaling is disabled."
   type        = number
   default     = 1
+}
+
+variable "enable_cluster_autoscaling" {
+  description = "Enable AKS cluster autoscaling on the default node pool."
+  type        = bool
+  default     = true
+}
+
+variable "min_node_count" {
+  description = "Minimum node count when autoscaling is enabled."
+  type        = number
+  default     = 1
+}
+
+variable "max_node_count" {
+  description = "Maximum node count when autoscaling is enabled."
+  type        = number
+  default     = 2
 }
 
 variable "vm_size" {

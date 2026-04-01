@@ -47,6 +47,11 @@ metadata:
     component: messaging
 spec:
   replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: {{ .Values.kafka.updateStrategy.maxSurge }}
+      maxUnavailable: {{ .Values.kafka.updateStrategy.maxUnavailable }}
   selector:
     matchLabels:
       app: kafka

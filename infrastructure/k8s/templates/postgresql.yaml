@@ -43,6 +43,11 @@ metadata:
     component: database
 spec:
   replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: {{ .Values.postgresql.updateStrategy.maxSurge }}
+      maxUnavailable: {{ .Values.postgresql.updateStrategy.maxUnavailable }}
   selector:
     matchLabels:
       app: postgresql

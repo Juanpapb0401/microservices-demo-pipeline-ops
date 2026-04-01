@@ -25,6 +25,10 @@ postgresql:
       memory: "256Mi"
       cpu: "250m"
 
+  updateStrategy:
+    maxSurge: 0
+    maxUnavailable: 1
+
 kafka:
   image:
     repository: apache/kafka
@@ -46,6 +50,10 @@ kafka:
     limits:
       memory: "768Mi"
       cpu: "400m"
+
+  updateStrategy:
+    maxSurge: 0
+    maxUnavailable: 1
   
   config:
     # Kafka configuration for Apache Kafka in KRaft mode

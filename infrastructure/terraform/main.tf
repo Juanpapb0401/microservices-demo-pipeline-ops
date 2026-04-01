@@ -40,7 +40,10 @@ resource "azurerm_kubernetes_cluster" "aks" {
 
   default_node_pool {
     name       = "default"
-    node_count = var.node_count
+    node_count = var.enable_cluster_autoscaling ? null : var.node_count
+    auto_scaling_enabled = var.enable_cluster_autoscaling
+    min_count  = var.enable_cluster_autoscaling ? var.min_node_count : null
+    max_count  = var.enable_cluster_autoscaling ? var.max_node_count : null
     vm_size    = var.vm_size
     os_disk_size_gb = var.os_disk_size_gb
   }
