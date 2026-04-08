@@ -39,8 +39,7 @@ spec:
   - ports:
     - port: 80
 ---
-# kafka: accepts connections from vote (producer), worker (consumer),
-# and the kafka-topic-init Job (component: topic-init) that runs as a Helm hook
+# kafka: accepts connections only from vote (producer) and worker (consumer)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -59,9 +58,6 @@ spec:
     - podSelector:
         matchLabels:
           app: worker
-    - podSelector:
-        matchLabels:
-          component: topic-init
     ports:
     - port: 9092
 ---
