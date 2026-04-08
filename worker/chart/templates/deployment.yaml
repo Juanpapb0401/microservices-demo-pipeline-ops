@@ -17,10 +17,3 @@ spec:
       containers:
       - image: {{ .Values.image }}
         name: worker
-        resources:
-          requests:
-            cpu: {{ .Values.resources.requests.cpu | quote }}
-            memory: {{ .Values.resources.requests.memory | quote }}
-          limits:
-            cpu: {{ .Values.resources.limits.cpu | quote }}
-            memory: {{ .Values.resources.limits.memory | quote }}
