@@ -69,3 +69,21 @@ kafka:
     - name: votes
       partitions: 3
       replicationFactor: 1
+
+namespace:
+  quota:
+    pods: "20"
+    requestsCpu: "2"
+    requestsMemory: "2Gi"
+    limitsCpu: "4"
+    limitsMemory: "4Gi"
+  limitRange:
+    default:
+      cpu: "200m"
+      memory: "256Mi"
+    defaultRequest:
+      cpu: "100m"
+      memory: "128Mi"
+    max:
+      cpu: "1"
+      memory: "1Gi"
