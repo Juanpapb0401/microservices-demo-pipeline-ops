@@ -86,6 +86,30 @@ El workflow ops.yml selecciona namespace segun el payload entrante y aplica helm
 - Menor riesgo de impacto cruzado.
 - Promocion controlada entre ambientes.
 
+## Patron 4 - Retry
+
+### Problema que resuelve
+
+Los microservicios dependen de conexiones a Kafka y PostgreSQL que pueden fallar de forma transitoria durante reinicios, elecciones de lider de particion o picos de carga.
+
+### Solucion aplicada
+
+Se implementa Retry con exponential backoff en dos puntos:
+
+- vote (Java): KafkaProducerConfig configura el producer para reintentar 3 veces con 1 segundo de espera ante fallos de publicacion.
+- worker (Go): las funciones newConsumerGroup y pingDatabase reintentan la conexion con backoff exponencial (1s, 2s, 4s, ..., max 30s).
+
+### Evidencia en este repositorio
+
+- Producer retry: vote/src/main/java/com/okteto/vote/kafka/KafkaProducerConfig.java
+- Connection retry: worker/main.go (funciones newConsumerGroup y pingDatabase)
+
+### Beneficios
+
+- Los votos no se pierden ante reinicios breves de Kafka.
+- El worker arranca sin intervencion manual aunque los servicios dependientes tarden en estar listos.
+- El backoff exponencial evita saturar Kafka con reconexiones simultaneas de multiples workers.
+
 ## Resumen
 
 | Patron | Categoria | Implementacion principal |
@@ -93,3 +117,4 @@ El workflow ops.yml selecciona namespace segun el payload entrante y aplica helm
 | Publisher Subscriber | Mensajeria | Kafka entre vote y worker |
 | Competing Consumers | Escalabilidad | Multiples workers consumiendo en paralelo |
 | Bulkhead | Resiliencia | Namespaces staging y production |
+| Retry | Resiliencia | KafkaProducerConfig.java y worker/main.go |
