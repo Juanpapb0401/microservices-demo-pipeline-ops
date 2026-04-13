@@ -3,40 +3,11 @@
 ## Introduccion
 
 Este documento describe los patrones cloud aplicados en el ecosistema app-repo + ops-repo.
-Se enfoca en implementaciones que son visibles en Kubernetes y verificables en ejecucion.
+Se enfoca en implementaciones visibles en Kubernetes y verificables en ejecucion.
+En esta version del ops-repo se documentan solo los patrones operativos usados para despliegue,
+aislamiento y resiliencia.
 
-## Patron 1 - Publisher Subscriber
-
-### Problema que resuelve
-
-Si vote dependiera de una llamada directa al worker para persistir votos, tendriamos acoplamiento fuerte.
-Una caida o lentitud del worker impactaria de inmediato la experiencia del usuario en vote.
-
-### Solucion aplicada
-
-Kafka desacopla produccion y consumo de mensajes:
-
-- vote publica eventos en el topic votes.
-- worker consume eventos en forma asincrona.
-- result consulta datos persistidos en PostgreSQL.
-
-Flujo simplificado:
-
-Usuario -> vote -> Kafka(votes) -> worker -> PostgreSQL -> result
-
-### Evidencia en este repositorio
-
-- Chart de infraestructura: infrastructure/k8s
-- Dependencias Kafka y PostgreSQL: infrastructure/k8s/templates
-- Provisionamiento y despliegue automatizado: .github/workflows/infra.yml
-
-### Beneficios
-
-- Desacoplamiento entre servicios.
-- Mayor resiliencia frente a caidas temporales del consumidor.
-- Capacidad de absorber picos de trafico por cola.
-
-## Patron 2 - Competing Consumers
+## Patron 1 - Competing Consumers
 
 ### Problema que resuelve
 
@@ -47,10 +18,16 @@ Con una sola replica de worker, el procesamiento de votos puede saturarse ante p
 Multiples replicas de worker consumen el mismo topic mediante consumer group,
 permitiendo paralelismo y reparto de particiones.
 
+Flujo simplificado:
+
+Kafka(votes) -> worker-1
+			  -> worker-2
+			  -> worker-3
+
 ### Evidencia en este repositorio
 
 - Helm chart del servicio worker: worker/chart
-- Despliegue por helm upgrade en ops.yml hacia el entorno objetivo.
+- Automatizacion de despliegue por Helm en .github/workflows/ops.yml y .github/workflows/ops-push.yml.
 
 Nota: para paralelismo efectivo, el topic debe tener suficientes particiones.
 
@@ -60,7 +37,7 @@ Nota: para paralelismo efectivo, el topic debe tener suficientes particiones.
 - Menor latencia de drenaje de cola.
 - Mejor throughput bajo carga.
 
-## Patron 3 - Bulkhead
+## Patron 2 - Bulkhead
 
 ### Problema que resuelve
 
@@ -73,12 +50,13 @@ Se separan despliegues por namespace de Kubernetes:
 - staging
 - production
 
-El workflow ops.yml selecciona namespace segun el payload entrante y aplica helm upgrade en el entorno correcto.
+Los workflows de operaciones seleccionan el namespace segun rama o payload entrante,
+y aplican helm upgrade en el entorno correcto.
 
 ### Evidencia en este repositorio
 
-- Seleccion de entorno en .github/workflows/ops.yml
-- Despliegue con namespace en .github/workflows/infra.yml y .github/workflows/ops.yml
+- Seleccion de entorno en .github/workflows/ops.yml y .github/workflows/ops-push.yml
+- Despliegue con namespace en .github/workflows/infra.yml, .github/workflows/ops.yml y .github/workflows/ops-push.yml
 
 ### Beneficios
 
@@ -86,7 +64,7 @@ El workflow ops.yml selecciona namespace segun el payload entrante y aplica helm
 - Menor riesgo de impacto cruzado.
 - Promocion controlada entre ambientes.
 
-## Patron 4 - Retry
+## Patron 3 - Retry
 
 ### Problema que resuelve
 
@@ -101,8 +79,13 @@ Se implementa Retry con exponential backoff en dos puntos:
 
 ### Evidencia en este repositorio
 
-- Producer retry: vote/src/main/java/com/okteto/vote/kafka/KafkaProducerConfig.java
-- Connection retry: worker/main.go (funciones newConsumerGroup y pingDatabase)
+- Pipeline de despliegue de servicios que preserva tag de imagen al actualizar charts:
+	.github/workflows/ops-push.yml
+- Pipeline de despliegue por dispatch que aplica Helm por servicio y entorno:
+	.github/workflows/ops.yml
+
+Nota: la implementacion de codigo del retry vive en app-repo; en ops-repo se valida su despliegue
+y promocion por entorno.
 
 ### Beneficios
 
@@ -114,7 +97,6 @@ Se implementa Retry con exponential backoff en dos puntos:
 
 | Patron | Categoria | Implementacion principal |
 |---|---|---|
-| Publisher Subscriber | Mensajeria | Kafka entre vote y worker |
 | Competing Consumers | Escalabilidad | Multiples workers consumiendo en paralelo |
 | Bulkhead | Resiliencia | Namespaces staging y production |
-| Retry | Resiliencia | KafkaProducerConfig.java y worker/main.go |
+| Retry | Resiliencia | Despliegue y promocion controlada de servicios con Helm |

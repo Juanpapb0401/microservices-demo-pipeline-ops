@@ -12,7 +12,6 @@ Flujo base:
 ## Arquitectura
 
 Diagrama de referencia:
-
 ![architecture.png](architecture.png)
 
 - Compute: AKS
@@ -46,9 +45,9 @@ Detalle completo: [docs/branching-strategy-ops.md](docs/branching-strategy-ops.m
 
 Se aplican tres patrones principales:
 
-1. Publisher Subscriber: vote publica en Kafka y worker consume asincronamente.
-2. Competing Consumers: multiples replicas de worker consumen en paralelo.
-3. Bulkhead: separacion por namespaces staging y production.
+1. Competing Consumers: multiples replicas de worker consumen en paralelo.
+2. Bulkhead: separacion por namespaces staging y production.
+3. Retry: reintentos con backoff en componentes de aplicacion, desplegados y promovidos por entorno desde ops-repo.
 
 Detalle completo: [docs/cloud-design-patterns.md](docs/cloud-design-patterns.md)
 
